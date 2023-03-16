@@ -91,13 +91,13 @@ class SendPasswordResetEmailView(APIView):
 
     def post(self, request, format=None):
         email = request.data.get("email")
+        serializer = SendPasswordResetEmailSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
         user = User.objects.get(email=email)
         if user.status == 'pending':
             return Response({"errors": {'non_field_error': ["Email is not verified. Please check your email inbox."]}}, status=status.HTTP_400_BAD_REQUEST)
         elif user.status == 'suspend':
             return Response({"errors": {'non_field_error': ["Account is not active"]}}, status=status.HTTP_400_BAD_REQUEST)
-        serializer = SendPasswordResetEmailSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
         return Response({"message": "Password reset link send to your email. Please check your email inbox."}, status=status.HTTP_200_OK)
 
 

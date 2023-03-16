@@ -1,15 +1,14 @@
 from rest_framework import serializers
 from django.contrib.auth.hashers import check_password
-from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
-from django.utils.encoding import force_bytes, smart_str, DjangoUnicodeDecodeError
 from .models import User
 from datetime import datetime
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 from django.utils import timezone
-from .emailTemplates.verifyEmail import emailVerifyTemplate
 from .emailTemplates.resetPassword import resetPasswordTemplate
+from django.utils.encoding import smart_str, DjangoUnicodeDecodeError, force_bytes
 from .token import account_activation_token, password_reset_token
-from .utils import Util
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from .utils import Util, sendEmail
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
@@ -22,18 +21,9 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         user = User.objects.create_user(**validated_data)
-        uid = urlsafe_base64_encode(force_bytes(user.id))
-        token = account_activation_token.make_token(user)
-        link = f'http://localhost:3000/auth/verify-email?uid={uid}&token={token}'
-        html = emailVerifyTemplate.replace("{link}", link)
 
-        data = {
-            'subject': 'Welcome to veWriter',
-            'body': html,
-            'to_email': user.email
-        }
+        sendEmail(user)
 
-        Util.send_email(data)
         return user
 
 
@@ -131,8 +121,10 @@ class SendPasswordResetEmailSerializer(serializers.Serializer):
         email = attrs.get("email")
         if User.objects.filter(email=email).exists():
             user = User.objects.get(email=email)
+
             uid = urlsafe_base64_encode(force_bytes(user.id))
             token = password_reset_token.make_token(user)
+
             link = f'http://localhost:3000/auth/reset-password?uid={uid}&token={token}'
 
             html = resetPasswordTemplate.replace("{name}", user.first_name)
